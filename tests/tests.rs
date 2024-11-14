@@ -20,7 +20,6 @@ async fn call_success_test() -> Result<()> {
                 "CREATE TABLE person(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);",
                 [],
             )
-            .map_err(|e| e.into())
         })
         .await?;
 
@@ -52,12 +51,10 @@ async fn call_unwrap_success_test() -> Result<()> {
 async fn call_failure_test() -> Result<()> {
     let conn = Connection::open_in_memory().await?;
 
-    let result = conn
-        .call(|conn| conn.execute("Invalid sql", []).map_err(|e| e.into()))
-        .await;
+    let result = conn.call(|conn| conn.execute("Invalid sql", [])).await;
 
     assert!(match result.unwrap_err() {
-        Error::Rusqlite(e) => {
+        Error::Error(e) => {
             e == rusqlite::Error::SqlInputError {
                 error: ffi::Error {
                     code: ErrorCode::Unknown,
@@ -103,14 +100,9 @@ async fn close_call_test() -> Result<()> {
 
     assert!(conn.close().await.is_ok());
 
-    let result = conn2
-        .call(|conn| conn.execute("SELECT 1;", []).map_err(|e| e.into()))
-        .await;
+    let result = conn2.call(|conn| conn.execute("SELECT 1;", [])).await;
 
-    assert!(matches!(
-        result.unwrap_err(),
-        Error::ConnectionClosed
-    ));
+    assert!(matches!(result.unwrap_err(), Error::ConnectionClosed));
 
     Ok(())
 }
@@ -139,7 +131,6 @@ async fn close_failure_test() -> Result<()> {
             "CREATE TABLE person(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);",
             [],
         )
-        .map_err(|e| e.into())
     })
     .await?;
 
@@ -184,17 +175,17 @@ async fn debug_format_test() -> Result<()> {
 async fn test_error_display() -> Result<()> {
     let conn = Connection::open_in_memory().await?;
 
-    let error = Error::Close((conn, rusqlite::Error::InvalidQuery));
+    let error: Error = Error::Close((conn, rusqlite::Error::InvalidQuery));
     assert_eq!(
         "Close((Connection, \"Query is not read-only\"))",
         format!("{error}")
     );
 
-    let error = Error::ConnectionClosed;
+    let error: Error = Error::ConnectionClosed;
     assert_eq!("ConnectionClosed", format!("{error}"));
 
-    let error = Error::Rusqlite(rusqlite::Error::InvalidQuery);
-    assert_eq!("Rusqlite(\"Query is not read-only\")", format!("{error}"));
+    let error = Error::Error(rusqlite::Error::InvalidQuery);
+    assert_eq!("Error(\"Query is not read-only\")", format!("{error}"));
 
     Ok(())
 }
@@ -203,7 +194,7 @@ async fn test_error_display() -> Result<()> {
 async fn test_error_source() -> Result<()> {
     let conn = Connection::open_in_memory().await?;
 
-    let error = Error::Close((conn, rusqlite::Error::InvalidQuery));
+    let error: Error = Error::Close((conn, rusqlite::Error::InvalidQuery));
     assert_eq!(
         std::error::Error::source(&error)
             .and_then(|e| e.downcast_ref::<rusqlite::Error>())
@@ -211,13 +202,13 @@ async fn test_error_source() -> Result<()> {
         &rusqlite::Error::InvalidQuery,
     );
 
-    let error = Error::ConnectionClosed;
+    let error: Error = Error::ConnectionClosed;
     assert_eq!(
         std::error::Error::source(&error).and_then(|e| e.downcast_ref::<rusqlite::Error>()),
         None,
     );
 
-    let error = Error::Rusqlite(rusqlite::Error::InvalidQuery);
+    let error = Error::Error(rusqlite::Error::InvalidQuery);
     assert_eq!(
         std::error::Error::source(&error)
             .and_then(|e| e.downcast_ref::<rusqlite::Error>())
@@ -236,16 +227,33 @@ fn failable_func(_: &rusqlite::Connection) -> std::result::Result<(), MyError> {
 async fn test_ergonomic_errors() -> Result<()> {
     let conn = Connection::open_in_memory().await?;
 
-    let res = conn
-        .call(|conn| failable_func(conn).map_err(|e| Error::Other(Box::new(e))))
-        .await
-        .unwrap_err();
+    let err = conn.call(|conn| failable_func(conn)).await.unwrap_err();
 
-    let err = std::error::Error::source(&res)
-        .and_then(|e| e.downcast_ref::<MyError>())
-        .unwrap();
+    assert!(matches!(err, Error::Error(MyError::MySpecificError)));
 
-    assert!(matches!(err, MyError::MySpecificError));
+    conn.call(|_conn| Ok(())).await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_call_raw() -> Result<()> {
+    let conn = Connection::open_in_memory().await?;
+
+    let err = conn.call_raw(|_conn| Err(())).await.expect("call success");
+
+    assert!(matches!(err, Err::<(), ()>(())));
+
+    let ok = conn.call_raw(|_conn| Ok(())).await.expect("call success");
+
+    assert!(matches!(ok, Ok::<(), ()>(())));
+
+    let conn2 = conn.clone();
+    conn.close().await?;
+
+    let err: Result<Result<()>> = conn2.call_raw(|_conn| Ok(())).await;
+
+    assert!(matches!(err, Err(crate::Error::ConnectionClosed)));
 
     Ok(())
 }
