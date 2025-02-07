@@ -345,7 +345,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-rusqlite-new"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "crossbeam-channel",
  "rusqlite",

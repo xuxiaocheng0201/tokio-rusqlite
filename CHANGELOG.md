@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 Nothing.
 
+# 0.7.0 (7 Feb 2025)
+
+- **updated:** To latest [rusqlite] version (`0.33`).
+
 # 0.6.0 (20 Sep 2024)
 
 - **updated**: [rusqlite] version to `0.32`.

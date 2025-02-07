@@ -17,7 +17,7 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use tokio_rusqlite::{params, Connection, Result};
+//! use tokio_rusqlite_new::{params, Connection, Result};
 //!
 //! #[derive(Debug)]
 //! struct Person {
