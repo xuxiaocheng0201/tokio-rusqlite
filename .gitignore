@@ -1,2 +1,12 @@
-/target
-/Cargo.lock
+/*
+
+!/.gitignore
+!/Cargo.toml
+!/Cargo.lock
+
+!/src
+!/examples
+
+!/README.md
+!/CHANGELOG.md
+!/LICENSE
