@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
-use tokio_rusqlite_new::{params, Connection, Result};
+use rusqlite::params;
+use tokio_rusqlite_new::{Connection, Result};
 
 #[derive(Debug)]
 struct Person {
@@ -44,7 +45,7 @@ async fn main() -> Result<()> {
                         data: row.get(2)?,
                     })
                 })?
-                .collect::<std::result::Result<Vec<Person>, rusqlite::Error>>()?;
+                .collect::<Result<Vec<Person>, rusqlite::Error>>()?;
 
             Ok(people)
         })

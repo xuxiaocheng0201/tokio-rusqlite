@@ -31,7 +31,8 @@ the thread and then returned from function.
 ## Usage
 
 ```rust
-use tokio_rusqlite_new::{params, Connection, Result};
+use rusqlite::params;
+use tokio_rusqlite_new::{Connection, Result};
 
 #[derive(Debug)]
 struct Person {

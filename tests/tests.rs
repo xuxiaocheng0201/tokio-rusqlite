@@ -166,7 +166,7 @@ async fn close_failure_test() -> Result<()> {
 async fn debug_format_test() -> Result<()> {
     let conn = Connection::open_in_memory().await?;
 
-    assert_eq!("Connection".to_string(), format!("{conn:?}"));
+    assert_eq!("Connection { .. }".to_string(), format!("{conn:?}"));
 
     Ok(())
 }
@@ -219,7 +219,7 @@ async fn test_error_source() -> Result<()> {
     Ok(())
 }
 
-fn failable_func(_: &rusqlite::Connection) -> std::result::Result<(), MyError> {
+fn failable_func(_: &rusqlite::Connection) -> Result<(), MyError> {
     Err(MyError::MySpecificError)
 }
 
