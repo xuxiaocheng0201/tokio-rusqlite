@@ -1,5 +1,5 @@
 [package]
-name = "tokio-rusqlite"
+name = "tokio-rusqlite-new"
 version = "0.6.0"
 authors = ["Programatik <programatik29@gmail.com>", "Adi Salimgereev <adisalimgereev@gmail.com>"]
 edition = "2021"

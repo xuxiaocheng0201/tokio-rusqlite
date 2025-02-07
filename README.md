@@ -2,9 +2,11 @@
 [![Crates.io](https://img.shields.io/crates/v/tokio-rusqlite)](https://crates.io/crates/tokio-rusqlite)
 [![Docs - Stable](https://img.shields.io/crates/v/tokio-rusqlite?color=blue&label=docs)](https://docs.rs/tokio-rusqlite/)
 
-# tokio-rusqlite
+# tokio-rusqlite-new
 
 Asynchronous handle for rusqlite library.
+
+This is a fork of [tokio-rusqlite](https://github.com/programatik29/tokio-rusqlite).
 
 # Usage
 
