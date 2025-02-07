@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
-use crate::*;
+use rusqlite::{ffi, ErrorCode};
+use tokio_rusqlite_new::{Connection, Error, Result};
 
 #[tokio::test]
 async fn open_in_memory_test() -> Result<()> {
@@ -21,9 +22,9 @@ async fn call_success_test() -> Result<()> {
             )
             .map_err(|e| e.into())
         })
-        .await;
+        .await?;
 
-    assert_eq!(0, result.unwrap());
+    assert_eq!(0, result);
 
     Ok(())
 }
@@ -56,7 +57,7 @@ async fn call_failure_test() -> Result<()> {
         .await;
 
     assert!(match result.unwrap_err() {
-        crate::Error::Rusqlite(e) => {
+        Error::Rusqlite(e) => {
             e == rusqlite::Error::SqlInputError {
                 error: ffi::Error {
                     code: ErrorCode::Unknown,
@@ -108,7 +109,7 @@ async fn close_call_test() -> Result<()> {
 
     assert!(matches!(
         result.unwrap_err(),
-        crate::Error::ConnectionClosed
+        Error::ConnectionClosed
     ));
 
     Ok(())
@@ -143,7 +144,7 @@ async fn close_failure_test() -> Result<()> {
     .await?;
 
     conn.call(|conn| {
-        // Leak a prepared statement to make the database uncloseable
+        // Leak a prepared statement to make the database unclose-able
         // See https://www.sqlite.org/c3ref/close.html for details regarding this behaviour
         let stmt = Box::new(conn.prepare("INSERT INTO person VALUES (1, ?1);").unwrap());
         Box::leak(stmt);
@@ -152,7 +153,7 @@ async fn close_failure_test() -> Result<()> {
     .await?;
 
     assert!(match conn.close().await.unwrap_err() {
-        crate::Error::Close((_, e)) => {
+        Error::Close((_, e)) => {
             e == rusqlite::Error::SqliteFailure(
                 ffi::Error {
                     code: ErrorCode::DatabaseBusy,
@@ -183,16 +184,16 @@ async fn debug_format_test() -> Result<()> {
 async fn test_error_display() -> Result<()> {
     let conn = Connection::open_in_memory().await?;
 
-    let error = crate::Error::Close((conn, rusqlite::Error::InvalidQuery));
+    let error = Error::Close((conn, rusqlite::Error::InvalidQuery));
     assert_eq!(
         "Close((Connection, \"Query is not read-only\"))",
         format!("{error}")
     );
 
-    let error = crate::Error::ConnectionClosed;
+    let error = Error::ConnectionClosed;
     assert_eq!("ConnectionClosed", format!("{error}"));
 
-    let error = crate::Error::Rusqlite(rusqlite::Error::InvalidQuery);
+    let error = Error::Rusqlite(rusqlite::Error::InvalidQuery);
     assert_eq!("Rusqlite(\"Query is not read-only\")", format!("{error}"));
 
     Ok(())
@@ -202,7 +203,7 @@ async fn test_error_display() -> Result<()> {
 async fn test_error_source() -> Result<()> {
     let conn = Connection::open_in_memory().await?;
 
-    let error = crate::Error::Close((conn, rusqlite::Error::InvalidQuery));
+    let error = Error::Close((conn, rusqlite::Error::InvalidQuery));
     assert_eq!(
         std::error::Error::source(&error)
             .and_then(|e| e.downcast_ref::<rusqlite::Error>())
@@ -210,13 +211,13 @@ async fn test_error_source() -> Result<()> {
         &rusqlite::Error::InvalidQuery,
     );
 
-    let error = crate::Error::ConnectionClosed;
+    let error = Error::ConnectionClosed;
     assert_eq!(
         std::error::Error::source(&error).and_then(|e| e.downcast_ref::<rusqlite::Error>()),
         None,
     );
 
-    let error = crate::Error::Rusqlite(rusqlite::Error::InvalidQuery);
+    let error = Error::Rusqlite(rusqlite::Error::InvalidQuery);
     assert_eq!(
         std::error::Error::source(&error)
             .and_then(|e| e.downcast_ref::<rusqlite::Error>())

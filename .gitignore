@@ -5,6 +5,7 @@
 !/Cargo.lock
 
 !/src
+!/tests
 !/examples
 
 !/README.md

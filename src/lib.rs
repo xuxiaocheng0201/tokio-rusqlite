@@ -3,16 +3,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-#[cfg(test)]
-mod tests;
+use std::fmt::{Debug, Display};
+use std::path::Path;
 
 use crossbeam_channel::{Receiver, Sender};
-use std::{
-    fmt::{self, Debug, Display},
-    path::Path,
-    thread,
-};
-use tokio::sync::oneshot::{self};
+use tokio::sync::oneshot;
 
 pub use rusqlite::*;
 
@@ -25,20 +20,20 @@ pub enum Error {
     /// The connection to the SQLite has been closed and cannot be queried anymore.
     ConnectionClosed,
 
-    /// An error occured while closing the SQLite connection.
+    /// An error occurred while closing the SQLite connection.
     /// This `Error` variant contains the [`Connection`], which can be used to retry the close operation
     /// and the underlying [`rusqlite::Error`] that made it impossible to close the database.
     Close((Connection, rusqlite::Error)),
 
-    /// A `Rusqlite` error occured.
+    /// A `Rusqlite` error occurred.
     Rusqlite(rusqlite::Error),
 
-    /// An application-specific error occured.
+    /// An application-specific error occurred.
     Other(Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
 impl Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::ConnectionClosed => write!(f, "ConnectionClosed"),
             Error::Close((_, e)) => write!(f, "Close((Connection, \"{e}\"))"),
@@ -66,7 +61,7 @@ impl From<rusqlite::Error> for Error {
 }
 
 /// The result returned on method calls in this crate.
-pub type Result<T, E=Error> = std::result::Result<T, E>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 type CallFn = Box<dyn FnOnce(&mut rusqlite::Connection) + Send + 'static>;
 
@@ -106,7 +101,7 @@ impl Connection {
         start(rusqlite::Connection::open_in_memory).await
     }
 
-    /// Open a new connection to a SQLite database.
+    /// Open a new connection to an SQLite database.
     ///
     /// [Database Connection](http://www.sqlite.org/c3ref/open.html) for a
     /// description of valid flag combinations.
@@ -194,7 +189,7 @@ impl Connection {
     /// asynchronously.
     ///
     /// This method can cause a `panic` if the underlying database connection is closed.
-    /// it is a more user-friendly alternative to the [`Connection::call`] method.
+    /// It is a more user-friendly alternative to the [`Connection::call`] method.
     /// It should be safe if the connection is never explicitly closed (using the [`Connection::close`] call).
     ///
     /// Calling this on a closed connection will cause a `panic`.
@@ -252,7 +247,7 @@ impl Connection {
 }
 
 impl Debug for Connection {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Connection").finish()
     }
 }
@@ -260,7 +255,7 @@ impl Debug for Connection {
 impl From<rusqlite::Connection> for Connection {
     fn from(conn: rusqlite::Connection) -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded::<Message>();
-        thread::spawn(move || event_loop(conn, receiver));
+        std::thread::spawn(move || event_loop(conn, receiver));
 
         Self { sender }
     }
@@ -273,7 +268,7 @@ where
     let (sender, receiver) = crossbeam_channel::unbounded::<Message>();
     let (result_sender, result_receiver) = oneshot::channel();
 
-    thread::spawn(move || {
+    std::thread::spawn(move || {
         let conn = match open() {
             Ok(c) => c,
             Err(e) => {
