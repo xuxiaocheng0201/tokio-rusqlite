@@ -1,99 +1,7 @@
-//! Asynchronous handle for rusqlite library.
-//!
-//! # Guide
-//!
-//! This library provides [`Connection`] struct. [`Connection`] struct is a handle
-//! to call functions in background thread and can be cloned cheaply.
-//! [`Connection::call`] method calls provided function in the background thread
-//! and returns its result asynchronously.
-//!
-//! # Design
-//!
-//! A thread is spawned for each opened connection handle. When `call` method
-//! is called: provided function is boxed, sent to the thread through mpsc
-//! channel and executed. Return value is then sent by oneshot channel from
-//! the thread and then returned from function.
-//!
-//! # Example
-//!
-//! ```rust,no_run
-//! use tokio_rusqlite_new::{params, Connection, Result};
-//!
-//! #[derive(Debug)]
-//! struct Person {
-//!     id: i32,
-//!     name: String,
-//!     data: Option<Vec<u8>>,
-//! }
-//!
-//! #[tokio::main]
-//! async fn main() -> Result<()> {
-//!     let conn = Connection::open_in_memory().await?;
-//!
-//!     let people = conn
-//!         .call(|conn| {
-//!             conn.execute(
-//!                 "CREATE TABLE person (
-//!                     id    INTEGER PRIMARY KEY,
-//!                     name  TEXT NOT NULL,
-//!                     data  BLOB
-//!                 )",
-//!                 [],
-//!             )?;
-//!
-//!             let steven = Person {
-//!                 id: 1,
-//!                 name: "Steven".to_string(),
-//!                 data: None,
-//!             };
-//!
-//!             conn.execute(
-//!                 "INSERT INTO person (name, data) VALUES (?1, ?2)",
-//!                 params![steven.name, steven.data],
-//!             )?;
-//!
-//!             let mut stmt = conn.prepare("SELECT id, name, data FROM person")?;
-//!             let people = stmt
-//!                 .query_map([], |row| {
-//!                     Ok(Person {
-//!                         id: row.get(0)?,
-//!                         name: row.get(1)?,
-//!                         data: row.get(2)?,
-//!                     })
-//!                 })?
-//!                 .collect::<std::result::Result<Vec<Person>, rusqlite::Error>>()?;
-//!
-//!             Ok(people)
-//!         })
-//!         .await?;
-//!
-//!     for person in people {
-//!         println!("Found person {:?}", person);
-//!     }
-//!
-//!     Ok(())
-//! }
-//! ```
-
+#![doc = include_str!("../README.md")]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
-#![warn(
-    clippy::await_holding_lock,
-    clippy::cargo_common_metadata,
-    clippy::dbg_macro,
-    clippy::empty_enum,
-    clippy::enum_glob_use,
-    clippy::inefficient_to_string,
-    clippy::mem_forget,
-    clippy::mutex_integer,
-    clippy::needless_continue,
-    clippy::todo,
-    clippy::unimplemented,
-    clippy::wildcard_imports,
-    future_incompatible,
-    missing_docs,
-    missing_debug_implementations,
-    unreachable_pub
-)]
+#![warn(missing_docs)]
 
 #[cfg(test)]
 mod tests;
@@ -114,12 +22,12 @@ const BUG_TEXT: &str = "bug in tokio-rusqlite, please report";
 /// Represents the errors specific for this library.
 #[non_exhaustive]
 pub enum Error {
-    /// The connection to the SQLite has been closed and cannot be queried any more.
+    /// The connection to the SQLite has been closed and cannot be queried anymore.
     ConnectionClosed,
 
     /// An error occured while closing the SQLite connection.
     /// This `Error` variant contains the [`Connection`], which can be used to retry the close operation
-    /// and the underlying [`rusqlite::Error`] that made it impossile to close the database.
+    /// and the underlying [`rusqlite::Error`] that made it impossible to close the database.
     Close((Connection, rusqlite::Error)),
 
     /// A `Rusqlite` error occured.
@@ -158,13 +66,13 @@ impl From<rusqlite::Error> for Error {
 }
 
 /// The result returned on method calls in this crate.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 type CallFn = Box<dyn FnOnce(&mut rusqlite::Connection) + Send + 'static>;
 
 enum Message {
     Execute(CallFn),
-    Close(oneshot::Sender<std::result::Result<(), rusqlite::Error>>),
+    Close(oneshot::Sender<Result<(), rusqlite::Error>>),
 }
 
 /// A handle to call functions in background thread.
@@ -174,7 +82,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    /// Open a new connection to a SQLite database.
+    /// Open a new connection to an SQLite database.
     ///
     /// `Connection::open(path)` is equivalent to
     /// `Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE |
@@ -186,9 +94,7 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub async fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_owned();
-        start(move || rusqlite::Connection::open(path))
-            .await
-            .map_err(Error::Rusqlite)
+        start(move || rusqlite::Connection::open(path)).await
     }
 
     /// Open a new connection to an in-memory SQLite database.
@@ -197,9 +103,7 @@ impl Connection {
     ///
     /// Will return `Err` if the underlying SQLite open call fails.
     pub async fn open_in_memory() -> Result<Self> {
-        start(rusqlite::Connection::open_in_memory)
-            .await
-            .map_err(Error::Rusqlite)
+        start(rusqlite::Connection::open_in_memory).await
     }
 
     /// Open a new connection to a SQLite database.
@@ -213,12 +117,10 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub async fn open_with_flags<P: AsRef<Path>>(path: P, flags: OpenFlags) -> Result<Self> {
         let path = path.as_ref().to_owned();
-        start(move || rusqlite::Connection::open_with_flags(path, flags))
-            .await
-            .map_err(Error::Rusqlite)
+        start(move || rusqlite::Connection::open_with_flags(path, flags)).await
     }
 
-    /// Open a new connection to a SQLite database using the specific flags
+    /// Open a new connection to an SQLite database using the specific flags
     /// and vfs name.
     ///
     /// [Database Connection](http://www.sqlite.org/c3ref/open.html) for a
@@ -235,9 +137,7 @@ impl Connection {
     ) -> Result<Self> {
         let path = path.as_ref().to_owned();
         let vfs = vfs.to_owned();
-        start(move || rusqlite::Connection::open_with_flags_and_vfs(path, flags, &vfs))
-            .await
-            .map_err(Error::Rusqlite)
+        start(move || rusqlite::Connection::open_with_flags_and_vfs(path, flags, &vfs)).await
     }
 
     /// Open a new connection to an in-memory SQLite database.
@@ -249,9 +149,7 @@ impl Connection {
     ///
     /// Will return `Err` if the underlying SQLite open call fails.
     pub async fn open_in_memory_with_flags(flags: OpenFlags) -> Result<Self> {
-        start(move || rusqlite::Connection::open_in_memory_with_flags(flags))
-            .await
-            .map_err(Error::Rusqlite)
+        start(move || rusqlite::Connection::open_in_memory_with_flags(flags)).await
     }
 
     /// Open a new connection to an in-memory SQLite database using the
@@ -266,9 +164,7 @@ impl Connection {
     /// string or if the underlying SQLite open call fails.
     pub async fn open_in_memory_with_flags_and_vfs(flags: OpenFlags, vfs: &str) -> Result<Self> {
         let vfs = vfs.to_owned();
-        start(move || rusqlite::Connection::open_in_memory_with_flags_and_vfs(flags, &vfs))
-            .await
-            .map_err(Error::Rusqlite)
+        start(move || rusqlite::Connection::open_in_memory_with_flags_and_vfs(flags, &vfs)).await
     }
 
     /// Call a function in background thread and get the result
@@ -370,7 +266,7 @@ impl From<rusqlite::Connection> for Connection {
     }
 }
 
-async fn start<F>(open: F) -> rusqlite::Result<Connection>
+async fn start<F>(open: F) -> Result<Connection>
 where
     F: FnOnce() -> rusqlite::Result<rusqlite::Connection> + Send + 'static,
 {
@@ -397,6 +293,7 @@ where
         .await
         .expect(BUG_TEXT)
         .map(|_| Connection { sender })
+        .map_err(Error::Rusqlite)
 }
 
 fn event_loop(mut conn: rusqlite::Connection, receiver: Receiver<Message>) {
