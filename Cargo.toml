@@ -20,7 +20,7 @@ tokio = { version = "^1.43", features = ["sync"] }
 
 [dev-dependencies]
 rusqlite = { version = "~0.33", features = ["bundled"] }
-tokio = { version = "^1.43", features = ["full"] }
+tokio = { version = "^1.43", features = ["rt-multi-thread", "macros"] }
 
 [[test]]
 name = "tests"
