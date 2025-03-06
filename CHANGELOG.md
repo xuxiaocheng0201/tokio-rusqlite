@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 Nothing.
 
+# 0.8.0 (6 Mar 2025)
+
+- **updated:** To latest [rusqlite] version (`0.34`).
+- **updated:** Refactor `Error` mainly by https://github.com/programatik29/tokio-rusqlite/pull/39.
+
 # 0.7.0 (7 Feb 2025)
 
 - **updated:** To latest [rusqlite] version (`0.33`).
