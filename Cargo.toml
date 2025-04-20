@@ -15,12 +15,12 @@ bundled = ["rusqlite/bundled"]
 
 [dependencies]
 crossbeam-channel = "~0.5"
-rusqlite = "~0.34"
-tokio = { version = "^1.43", features = ["sync"] }
+rusqlite = "~0.35"
+tokio = { version = "^1.44", features = ["sync"] }
 
 [dev-dependencies]
-rusqlite = { version = "~0.34", features = ["bundled"] }
-tokio = { version = "^1.43", features = ["rt-multi-thread", "macros"] }
+rusqlite = { version = "~0.35", features = ["bundled"] }
+tokio = { version = "^1.44", features = ["rt-multi-thread", "macros"] }
 
 [[test]]
 name = "tests"
