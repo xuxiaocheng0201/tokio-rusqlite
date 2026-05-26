@@ -176,7 +176,7 @@ where
     let (opener_sender, opener_receiver) = oneshot::channel();
     std::thread::spawn(move || match open() {
         Ok(conn) => {
-            if let Err(_) = opener_sender.send(Ok(())) { return; }
+            if opener_sender.send(Ok(())).is_err() { return; }
             event_loop(conn, receiver);
         },
         Err(e) => {
